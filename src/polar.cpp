@@ -1,32 +1,35 @@
 #include "polar.h"
+#include <cstdint>
+#include <limits>
 
 using std::string;
 using std::vector;
 
-// public number functions------------------------------------------------------------------------------------------------
-POLAR::POLAR(uint32_t info_length, uint32_t code_length, const string construct_method, const double design_para)
-{
+// public number
+// functions------------------------------------------------------------------------------------------------
+POLAR::POLAR(uint32_t info_length, uint32_t code_length, const string construct_method/*,
+             const double design_para*/) {
     //---------------------------------------------------------------------------------
     // polar construction
     // Input:
     //		info_length: information bits length
     //		code_length: coded bit length
     // 		construct_method: "Huawei approx", "BP", "GA"
-    // 		design_para: N/A for"Huawei approx"; erasure probability for "BP"; design SNR in dB for "GA"
-    // Dr. J Mao 2021 Sep
+    // 		design_para: N/A for"Huawei approx"; erasure probability for "BP"; design SNR
+    // in dB for "GA" Dr. J Mao 2021 Sep
     //---------------------------------------------------------------------------------
 
-    m_M = code_length;					// codeword length
-    m_N = static_cast<unsigned>(pow(2, ceil(log2(code_length)))); // mother codeword length
-    m_K = info_length;					// information length
+    m_M = code_length; // codeword length
+    m_N =
+        static_cast<unsigned>(pow(2, ceil(log2(code_length)))); // mother codeword length
+    m_K = info_length;                                          // information length
 
     // obtain sub-channel's reliability
     vector<double> W(m_N, 0);
     if (construct_method.compare("Huawei Approx") == 0) {
         W = channel_polarization_huawei_approx(m_N);
-    }
-    else {
-        //other methods to be added
+    } else {
+        // other methods to be added
         perror("unknown construction methods!");
     }
 
@@ -40,7 +43,7 @@ POLAR::POLAR(uint32_t info_length, uint32_t code_length, const string construct_
     m_P = vector<unsigned>(m_Q.begin(), m_Q.begin() + (m_N - m_M));
     sort(m_P.begin(), m_P.end());
 
-    //frozen bits positions
+    // frozen bits positions
     m_F.reserve(m_N - m_K);
     m_F = vector<unsigned>(m_Q.begin(), m_Q.begin() + (m_N - m_K));
     sort(m_F.begin(), m_F.end());
@@ -50,8 +53,7 @@ POLAR::POLAR(uint32_t info_length, uint32_t code_length, const string construct_
     m_I = vector<unsigned>(m_Q.end() - m_K, m_Q.end());
     sort(m_I.begin(), m_I.end());
 }
-vector<bool> POLAR::encoder(vector<bool>* msg)
-{
+vector<bool> POLAR::encoder(vector<bool> *msg) {
     //---------------------------------------------------------------------------------
     // Polar code encoder
     // Input:
@@ -72,8 +74,7 @@ vector<bool> POLAR::encoder(vector<bool>* msg)
     // encode
     return polar_encode(u);
 }
-vector<bool> POLAR::sc_decoder(vector<double>* llr)
-{
+vector<bool> POLAR::sc_decoder(vector<double> *llr) {
     // make F into bitmap
     vector<bool> F_bit_map(m_N, 0);
     for (auto e : m_F)
@@ -84,14 +85,14 @@ vector<bool> POLAR::sc_decoder(vector<double>* llr)
     sc_node_operations(llr, F_bit_map, &u_cap);
 
     // extract message bits
-    vector<bool> msg_cap; msg_cap.reserve(m_K);
+    vector<bool> msg_cap;
+    msg_cap.reserve(m_K);
     for (auto e : m_I)
         msg_cap.push_back(u_cap[e]);
 
     return msg_cap;
 }
-vector<bool> POLAR::scl_decoder(vector<double>* llr, vector<bool> crcG, unsigned nL)
-{
+vector<bool> POLAR::scl_decoder(vector<double> *llr, vector<bool> crcG, unsigned nL) {
     //----------------------------------------------------------------------------------------
     // input:
     // 	   llr: channel info as log likelihood of received bits
@@ -102,13 +103,14 @@ vector<bool> POLAR::scl_decoder(vector<double>* llr, vector<bool> crcG, unsigned
     // Dr J Mao Sep 2021
     //----------------------------------------------------------------------------------------
 
-    uint32_t A = m_K - crcG.size() + 1;  // information bit length excluding padded CRC
+    uint32_t A = m_K - crcG.size() + 1; // information bit length excluding padded CRC
 
     // make F into bitmap
     vector<bool> F_bit_map(m_N, 0);
-    for (auto e : m_F) F_bit_map[e] = 1;
+    for (auto e : m_F)
+        F_bit_map[e] = 1;
 
-    //path metric with first element being 0, the rest are infinity
+    // path metric with first element being 0, the rest are infinity
     vector<double> PM(nL, std::numeric_limits<double>::infinity());
     PM[0] = 0;
 
@@ -142,8 +144,7 @@ vector<bool> POLAR::scl_decoder(vector<double>* llr, vector<bool> crcG, unsigned
 
     return msg_cap;
 }
-vector<bool> POLAR::rate_matching(vector<bool>* in)
-{
+vector<bool> POLAR::rate_matching(vector<bool> *in) {
     // note, P must be a sorted sequence
     unsigned iL = in->size();
     unsigned pL = m_P.size();
@@ -154,9 +155,9 @@ vector<bool> POLAR::rate_matching(vector<bool>* in)
 
     while (k < iL - pL && j < pL) {
         if (i == m_P[j]) {
-            j++; i++;
-        }
-        else {
+            j++;
+            i++;
+        } else {
             out[k++] = (*in)[i++];
         }
     }
@@ -167,8 +168,7 @@ vector<bool> POLAR::rate_matching(vector<bool>* in)
 
     return out;
 }
-vector<double>  POLAR::rate_recovery(vector<double>* in)
-{
+vector<double> POLAR::rate_recovery(vector<double> *in) {
     unsigned iL = in->size();
     unsigned pL = m_P.size();
 
@@ -180,8 +180,7 @@ vector<double>  POLAR::rate_recovery(vector<double>* in)
         if (k == m_P[j]) {
             k++;
             j++;
-        }
-        else {
+        } else {
             out[k++] = (*in)[i++];
         }
     }
@@ -192,9 +191,9 @@ vector<double>  POLAR::rate_recovery(vector<double>* in)
     return out;
 }
 
-//Private Core functions-----------------------------------------------------------------------------------------------------------------
-vector<bool> POLAR::polar_encode(vector<bool> u)
-{
+// Private Core
+// functions-----------------------------------------------------------------------------------------------------------------
+vector<bool> POLAR::polar_encode(vector<bool> u) {
     //---------------------------------------------------------------------------------
     // This function encodes u into x. x = u * F_N
     // where N = 2 ^ n bits,  F_N = F kroncker N, F = [1 0; 1 1];
@@ -206,12 +205,14 @@ vector<bool> POLAR::polar_encode(vector<bool> u)
         return u;
     else {
         // butterfly operation
-        vector<bool> u1_xor_u2; u1_xor_u2.reserve(N / 2);
-        for (int i = 0; i < N / 2; i++)
+        vector<bool> u1_xor_u2;
+        u1_xor_u2.reserve(N / 2);
+        for (uint32_t i = 0; i < N / 2; i++)
             u1_xor_u2.push_back(u[i] xor u[i + N / 2]);
 
         // recursive encoding for left half
-        vector<bool> x; x.reserve(N);
+        vector<bool> x;
+        x.reserve(N);
         x = polar_encode(u1_xor_u2);
 
         // for right half
@@ -221,39 +222,41 @@ vector<bool> POLAR::polar_encode(vector<bool> u)
         return x;
     }
 }
-vector<bool> POLAR::sc_node_operations(vector<double>* alpha, vector<bool> F, vector<bool>* u_cap)
-{
+vector<bool> POLAR::sc_node_operations(vector<double> *alpha, vector<bool> F,
+                                       vector<bool> *u_cap) {
     unsigned N = alpha->size();
-    vector<bool> beta; beta.reserve(N); // hard decisions for corresponding soft bits
+    vector<bool> beta;
+    beta.reserve(N); // hard decisions for corresponding soft bits
 
-    //std::cout << "alpha = [";
-    //for (auto e : alpha)
+    // std::cout << "alpha = [";
+    // for (auto e : alpha)
     //	std::cout << e << " ";
-    //std::cout<<"]"<< std::endl;
+    // std::cout<<"]"<< std::endl;
 
     if (N == 1) { // leaf nodes
         if (F[0] == 1) {
             beta.push_back(0); // frozen bits always zero
-        }
-        else {
+        } else {
             beta.push_back(((*alpha)[0] < 0) ? 1 : 0); // threshold detection
         }
 
         u_cap->push_back(beta[0]); // save decoded bits
-    }
-    else { // non-leaf nodes
+    } else {                       // non-leaf nodes
         vector<double> a(vector<double>(alpha->begin(), alpha->begin() + N / 2));
         vector<double> b(vector<double>(alpha->end() - N / 2, alpha->end()));
 
         // calculate llr for its left child
         vector<double> alpha_left(N / 2);
         for (unsigned i = 0; i < N / 2; i++) {
-            //alpha_left[i] = 2.0 * atanhf(tanhf(a[i] / 2.0) * tanhf(b[i] / 2.0)); // slower
+            // alpha_left[i] = 2.0 * atanhf(tanhf(a[i] / 2.0) * tanhf(b[i] / 2.0)); //
+            // slower
             int sign = (1 - 2 * (a[i] * b[i] < 0));
-            alpha_left[i] = (std::min(abs(a[i]), abs(b[i])) * sign); // much faster with ignorable loss
+            alpha_left[i] = (std::min(abs(a[i]), abs(b[i])) *
+                             sign); // much faster with ignorable loss
         }
 
-        // recursive decoding, pass llr message to its left child and expect for corresping hard decision
+        // recursive decoding, pass llr message to its left child and expect for
+        // corresping hard decision
         vector<bool> F_left(vector<bool>(F.begin(), F.begin() + N / 2));
         vector<bool> beta_left = sc_node_operations(&alpha_left, F_left, u_cap);
 
@@ -263,33 +266,33 @@ vector<bool> POLAR::sc_node_operations(vector<double>* alpha, vector<bool> F, ve
             alpha_right[i] = (beta_left[i] == 0) ? b[i] + a[i] : b[i] - a[i];
         }
 
-        // recursive decoding, pass llr message to its right child and expect for corresping hard decision
+        // recursive decoding, pass llr message to its right child and expect for
+        // corresping hard decision
         vector<bool> F_right(vector<bool>(F.end() - N / 2, F.end()));
         vector<bool> beta_right = sc_node_operations(&alpha_right, F_right, u_cap);
 
         // combine hard decision from its both children and return to its parent
 
-        for (int i = 0; i < N / 2; i++) {
+        for (unsigned int i = 0; i < N / 2; i++) {
             beta.push_back(beta_left[i] xor beta_right[i]);
         }
         beta.insert(beta.end(), beta_right.begin(), beta_right.end());
     }
-    //std::cout << "beta = [";
-    //for (auto e : beta)
+    // std::cout << "beta = [";
+    // for (auto e : beta)
     //	std::cout << e << " ";
-    //std::cout << "]" << std::endl;
+    // std::cout << "]" << std::endl;
     return beta;
 }
-void POLAR::scl_node_operations(vector<vector<double>>* llr, vector<vector<bool>>* hard_decision, vector<bool> F, vector<double>* PM, vector<vector<bool>>* u_cap)
-{
+void POLAR::scl_node_operations(vector<vector<double>> *llr,
+                                vector<vector<bool>> *hard_decision, vector<bool> F,
+                                vector<double> *PM, vector<vector<bool>> *u_cap) {
     //----------------------------------------------------------------------------------------
     // input:
     // 	   llr: channel info as log likelihood of received bits
-    // 	   hard decisions: the correspondingly hard bits of the llr, will be caculted as messgaes to pass around nodes
-    // 	   F: frozen bits in bitmask format
-    // 	   PM: path metric
-    // 	   u_cap: decoded bits
-    // Dr J Mao Sep 2021
+    // 	   hard decisions: the correspondingly hard bits of the llr, will be caculted as
+    // messgaes to pass around nodes 	   F: frozen bits in bitmask format 	   PM:
+    // path metric 	   u_cap: decoded bits Dr J Mao Sep 2021
     //----------------------------------------------------------------------------------------
 
     // the number of bits that the current node carries
@@ -312,26 +315,29 @@ void POLAR::scl_node_operations(vector<vector<double>>* llr, vector<vector<bool>
                 // PM update if llr < 0 , no sort and pruning in this case
                 (*PM)[i] = (*PM)[i] + abs(alpha[i]) * double((alpha[i] < 0));
             }
-        }
-        else { // leaf node is information bit
-            vector<bool> candi_dec; // candidate decoded bits
-            vector<double> candi_PM = *PM; // candidate path metrics
+        } else {                                // leaf node is information bit
+            vector<bool> candi_dec;             // candidate decoded bits
+            vector<double> candi_PM = *PM;      // candidate path metrics
             for (unsigned i = 0; i < nL; i++) { // hard decisions based on llr
                 candi_dec.push_back(alpha[i] < 0);
             }
-            for (unsigned i = 0; i < nL; i++) { // invert hard decisions and put penalty based on llr
+            for (unsigned i = 0; i < nL;
+                 i++) { // invert hard decisions and put penalty based on llr
                 candi_dec.push_back(alpha[i] >= 0);
                 candi_PM.push_back((*PM)[i] + abs(alpha[i]));
             }
 
             // sort candidates based on path metrics
             vector<size_t> sorted_idx = sort_indexes(candi_PM);
-            vector<uint8_t> selected_idx; selected_idx.reserve(nL);
+            vector<uint8_t> selected_idx;
+            selected_idx.reserve(nL);
 
             // sort and prune decoders
-            selected_idx.insert(selected_idx.end(), sorted_idx.begin(), sorted_idx.begin() + nL);
-            for (auto& ele : selected_idx) {
-                if (ele >= nL) ele -= nL;
+            selected_idx.insert(selected_idx.end(), sorted_idx.begin(),
+                                sorted_idx.begin() + nL);
+            for (auto &ele : selected_idx) {
+                if (ele >= nL)
+                    ele -= nL;
             }
             sort_and_prune(llr, selected_idx);
             sort_and_prune(hard_decision, selected_idx);
@@ -345,15 +351,14 @@ void POLAR::scl_node_operations(vector<vector<double>>* llr, vector<vector<bool>
                 (*hard_decision)[i].push_back(candi_dec[idx]);
             }
         }
-    }
-    else {
+    } else {
         // extract the last  node_size bits as the node's sot bits (alpha)
         vector<vector<double>> alpha(nL);
         for (unsigned i = 0; i < nL; i++) {
             alpha[i] = vector<double>((*llr)[i].end() - nb, (*llr)[i].end());
         }
 
-        //check node operation f(a,b) = sgn(a) * sgn(b) * min(|a|,|b|) (min sum approx)
+        // check node operation f(a,b) = sgn(a) * sgn(b) * min(|a|,|b|) (min sum approx)
         for (unsigned i = 0; i < nL; i++) {
             for (unsigned j = 0; j < nb / 2; j++) {
                 double a = alpha[i][j];
@@ -366,18 +371,19 @@ void POLAR::scl_node_operations(vector<vector<double>>* llr, vector<vector<bool>
         vector<bool> F_left(vector<bool>(F.begin(), F.begin() + nb / 2));
         scl_node_operations(llr, hard_decision, F_left, PM, u_cap);
 
-        //hard decisions returned by left child
+        // hard decisions returned by left child
         vector<vector<bool>> beta_left(nL);
         for (unsigned i = 0; i < nL; i++) {
-            beta_left[i] = vector<bool>((*hard_decision)[i].end() - nb / 2, (*hard_decision)[i].end());
+            beta_left[i] = vector<bool>((*hard_decision)[i].end() - nb / 2,
+                                        (*hard_decision)[i].end());
         }
 
-        //extract alpha again as it may have been sorted by the left child
+        // extract alpha again as it may have been sorted by the left child
         for (unsigned i = 0; i < nL; i++) {
-            alpha[i] = vector <double>((*llr)[i].end() - nb, (*llr)[i].end());
+            alpha[i] = vector<double>((*llr)[i].end() - nb, (*llr)[i].end());
         }
 
-        //bit node handling
+        // bit node handling
         for (unsigned i = 0; i < nL; i++) {
             for (unsigned j = 0; j < nb / 2; j++) {
                 double a = alpha[i][j];
@@ -394,21 +400,21 @@ void POLAR::scl_node_operations(vector<vector<double>>* llr, vector<vector<bool>
 
         // butterfly processing does beta = [beta_left xor beta_right, beta_right]
         int start_pos = (*hard_decision)[0].size() - nb;
-        for (auto& E : *hard_decision) {
+        for (auto &E : *hard_decision) {
             for (unsigned j = start_pos; j < start_pos + nb / 2; j++) {
                 E[j] = (E[j] + E[j + nb / 2]) % 2;
             }
         }
     }
 
-    // delete soft bits from the 2-D llr vectors (equivalent to poping out the calling stack)
-    for (auto& ELE : *llr) {
+    // delete soft bits from the 2-D llr vectors (equivalent to poping out the calling
+    // stack)
+    for (auto &ELE : *llr) {
         ELE.erase(ELE.end() - nb, ELE.end());
     }
 }
 template <typename T>
-inline void POLAR::sort_and_prune(vector<vector<T>>* V, vector<uint8_t> P)
-{
+inline void POLAR::sort_and_prune(vector<vector<T>> *V, vector<uint8_t> P) {
     vector<vector<T>> tmp;
 
     for (auto ele : P) {
@@ -418,9 +424,9 @@ inline void POLAR::sort_and_prune(vector<vector<T>>* V, vector<uint8_t> P)
     V->swap(tmp);
 }
 
-// static functions-----------------------------------------------------------------------------------------------------------------------
-vector<double> POLAR::channel_polarization_huawei_approx(unsigned N)
-{
+// static
+// functions-----------------------------------------------------------------------------------------------------------------------
+vector<double> POLAR::channel_polarization_huawei_approx(unsigned N) {
     //--------------------------------------------------------------------------------
     // return m_N subchannel's weight as a measure of their reliability
     // [ref] 3GPP R1 - 167209 Polar code design and rate matching
@@ -432,8 +438,7 @@ vector<double> POLAR::channel_polarization_huawei_approx(unsigned N)
     for (unsigned j = 0; j < N; j++) {
         unsigned tmp = j;
 
-        for (unsigned k = 0; k < n; k++)
-        {
+        for (unsigned k = 0; k < n; k++) {
             double bit_val = tmp % 2;
             W[j] += bit_val * pow(2, (k * 0.25));
             tmp = tmp / 2;
@@ -444,9 +449,7 @@ vector<double> POLAR::channel_polarization_huawei_approx(unsigned N)
 
     return W;
 }
-template<typename T>
-inline vector<size_t> POLAR::sort_indexes(const vector<T>& v)
-{
+template <typename T> inline vector<size_t> POLAR::sort_indexes(const vector<T> &v) {
     // initialize original index locations
     vector<size_t> idx(v.size());
     iota(idx.begin(), idx.end(), 0);
@@ -456,14 +459,13 @@ inline vector<size_t> POLAR::sort_indexes(const vector<T>& v)
     // to avoid unnecessary index re-orderings
     // when v contains elements of equal values
     stable_sort(idx.begin(), idx.end(),
-                [&v](size_t i1, size_t i2) {return v[i1] < v[i2]; });
+                [&v](size_t i1, size_t i2) { return v[i1] < v[i2]; });
 
     return idx;
 }
 
 // crc related
-bool POLAR::crc_check_sum(vector<bool>* msg, vector<bool> crc_g)
-{
+bool POLAR::crc_check_sum(vector<bool> *msg, vector<bool> crc_g) {
     unsigned crc_len = crc_g.size() - 1;
     uint32_t n = msg->size() - crc_len;
 
@@ -479,28 +481,23 @@ bool POLAR::crc_check_sum(vector<bool>* msg, vector<bool> crc_g)
 
     return 1;
 }
-void POLAR::crc_division(vector<int>* pad_msg, vector<int> gen)
-{
+void POLAR::crc_division(vector<int> *pad_msg, vector<int> gen) {
     unsigned r = gen.size() - 1;
     unsigned n = (*pad_msg).size() - r;
 
-    for (unsigned i = 0; i < n; i++)
-    {
-        if (gen[0] == (*pad_msg)[i])
-        {
+    for (unsigned i = 0; i < n; i++) {
+        if (gen[0] == (*pad_msg)[i]) {
             for (unsigned j = 0, k = i; j < r + 1; j++, k++) {
                 if (!((*pad_msg)[k] ^ gen[j])) {
                     (*pad_msg)[k] = 0;
-                }
-                else {
+                } else {
                     (*pad_msg)[k] = 1;
                 }
             }
         }
     }
 }
-vector<bool> POLAR::crc_gen(vector<bool>* msg, vector<bool> crc_g)
-{
+vector<bool> POLAR::crc_gen(vector<bool> *msg, vector<bool> crc_g) {
     unsigned crc_len = crc_g.size() - 1;
 
     vector<int> pad_msg(msg->begin(), msg->end());
@@ -511,25 +508,27 @@ vector<bool> POLAR::crc_gen(vector<bool>* msg, vector<bool> crc_g)
 
     crc_division(&pad_msg, gen);
 
-    vector<bool>  crc(pad_msg.end() - crc_len, pad_msg.end());
+    vector<bool> crc(pad_msg.end() - crc_len, pad_msg.end());
     return crc;
 }
-vector<bool> POLAR::crc_generator(const string crc_type)
-{
+vector<bool> POLAR::crc_generator(const string crc_type) {
     if (!crc_type.compare("24A"))
-        return { 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1 };
+        return {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0,
+                1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1};
     else if (!crc_type.compare("24B"))
-        return{ 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1 };
+        return {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1};
     else if (!crc_type.compare("24C"))
-        return{ 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1 };
+        return {1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1,
+                0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1};
     else if (!crc_type.compare("16"))
-        return{ 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+        return {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
     else if (!crc_type.compare("11"))
-        return{ 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+        return {1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1};
     else if (!crc_type.compare("6"))
-        return{ 1, 1, 0, 0, 0, 0, 1 };
+        return {1, 1, 0, 0, 0, 0, 1};
     else if (!crc_type.compare("1"))
-        return{ 1 };
+        return {1};
     else
         return {1};
 }
